@@ -9,6 +9,7 @@ from __future__ import print_function
 from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import os
+import glob
 import skimage.io as io
 import skimage.transform as trans
 
@@ -25,7 +26,7 @@ Unlabelled = [0, 0, 0]
 COLOR_DICT = np.array([labeled, Unlabelled])
 
 
-def adjustData(img, flag_multi_class, num_class, mask_path, gen_i, save_format):
+def adjustData(img, mask, flag_multi_class, num_class):
     if (flag_multi_class):
         """ Note: 
             img.shape = <class 'tuple'>: (2, 256, 256, 3);    
@@ -33,43 +34,33 @@ def adjustData(img, flag_multi_class, num_class, mask_path, gen_i, save_format):
         """
         img = img / 255
 
-        mask_pic_path = mask_path + '/' + str(gen_i) + '.' + save_format
-        mask_img = io.imread(mask_pic_path, as_gray=False)
-
-        """ Attention:
-
-                        The following scripts 'shape = (1, 256, 256, num_class)' because the batch_size set 1
-                    """
-        shape = (1, 256, 256, num_class)
-        new_mask = np.zeros(shape, dtype=np.uint8)   # Note: (1, 256, 256, 12)
+        mask_2 = mask[:, :, :, 0]   # Note: Executed for the new shape of the new_mask
+        new_mask = np.zeros(mask_2.shape + (num_class,))   # Note: (2, 256, 256, 12)
 
         for class_i in range(num_class):
-            a = mask_img == COLOR_DICT[class_i]
-            """ Attention:
-                
-                The following scripts 'for i in range(1)' because the batch_size set 1
-            """
+            a = mask == COLOR_DICT[class_i]
             for i in range(1):
                 for j in range(256):
                     for k in range(256):
                         """ Attention:
                             Only [true, true, true] means that this pixel belongs to such class
                         """
-                        if a[j][k][0]:
-                            if a[j][k][1]:
-                                if a[j][k][2]:
+                        if a[i][j][k][0]:
+                            if a[i][j][k][1]:
+                                if a[i][j][k][2]:
                                     new_mask[i][j][k][class_i] = 1
 
         """ Attention: There is a change, and the original is : new_mask = np.reshape(new_mask, (new_mask.shape[0], new_mask.shape[1] * new_mask.shape[2], new_mask.shape[3])) if flag_multi_class else np.reshape(new_mask, (new_mask.shape[0] * new_mask.shape[1], new_mask.shape[2]))"""
         new_mask = np.reshape(new_mask, (new_mask.shape[0], new_mask.shape[1], new_mask.shape[2], new_mask.shape[3])) if flag_multi_class else np.reshape(new_mask, (new_mask.shape[0], new_mask.shape[1], new_mask.shape[2]))
+        mask = new_mask
     else:
         print("Error: please check the codes")
         exit(1)
 
-    return (img, new_mask)
+    return (img, mask)
 
 
-def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict, train_data_num,
+def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict,
                    image_color_mode="rgb", mask_color_mode="rgb", image_save_prefix="image",
                    mask_save_prefix="mask",
                    flag_multi_class=True, num_class=2, save_to_dir=None, target_size=(256, 256), seed=1):
@@ -107,19 +98,12 @@ def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict, 
         batch_size=batch_size,                      # Note: 2
         save_to_dir=save_to_dir,                    # Note: None
         save_prefix=mask_save_prefix,               # Note: 'mask'
-        seed=seed,                                  # Note: 1; this parameter used as the random seed
-        save_format='png'
+        seed=seed                                   # Note: 1; this parameter used as the random seed
     )
 
-    mask_path = "./" + train_path + '/' + mask_folder
-    gen_i = 0
-    save_format = 'png'
-
     train_generator = zip(image_generator, mask_generator)  # Note: <zip object at 0x000001B604B10288>
-
     for (img, mask) in train_generator:
-        img, mask = adjustData(img, flag_multi_class, num_class, mask_path, gen_i, save_format)
-        gen_i = (gen_i + 1) % train_data_num
+        img, mask = adjustData(img, mask, flag_multi_class, num_class)
         yield (img, mask)
 
 
@@ -134,7 +118,6 @@ def testGenerator(test_path, num_image=30, target_size=(256, 256), flag_multi_cl
         yield img
 
 
-"""
 def geneTrainNpy(image_path, mask_path, flag_multi_class=True, num_class=2, image_prefix="image", mask_prefix="mask",
                  image_as_gray=False, mask_as_gray=False):
     image_name_arr = glob.glob(os.path.join(image_path, "%s*.png" % image_prefix))
@@ -151,7 +134,6 @@ def geneTrainNpy(image_path, mask_path, flag_multi_class=True, num_class=2, imag
     image_arr = np.array(image_arr)
     mask_arr = np.array(mask_arr)
     return image_arr, mask_arr
-"""
 
 
 def labelVisualize(num_class, color_dict, img):
@@ -202,8 +184,7 @@ data_gen_args = dict(rotation_range=0.2,
 
     Besides, notice that the variable 'myGene' is utilized by the script below: model.fit_generator(..)
 """
-train_data_num = 30
-myGene = trainGenerator(1, 'data/membrane/train', 'image', 'label', data_gen_args, train_data_num, save_to_dir=None)
+myGene = trainGenerator(1, 'data/membrane/train', 'image', 'label', data_gen_args, save_to_dir=None)
 
 """ Attention: the following codes should be executed while hdf5 not existing
 
@@ -213,8 +194,8 @@ myGene = trainGenerator(1, 'data/membrane/train', 'image', 'label', data_gen_arg
 """
 model = unet()
 model_checkpoint = ModelCheckpoint('unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)  # Note: the first parameter of the function: filepath: string, path to save the model file.
-model.fit_generator(myGene, steps_per_epoch=500, epochs=1, callbacks=[model_checkpoint])  # Note: myGnene: <generator object trainGenerator at 0x000001B67F9FD830>
+model.fit_generator(myGene, steps_per_epoch=200, epochs=1, callbacks=[model_checkpoint])  # Note: myGnene: <generator object trainGenerator at 0x000001B67F9FD830>
 
 testGene = testGenerator("data/membrane/test")
-results = model.predict_generator(testGene, 30, verbose=1)  # Note: {ndarray} shape = <class 'tuple'>: (2, 256, 256, 12)
+results = model.predict_generator(testGene, 30, verbose=1)  # Note: {ndarray} shape = <class 'tuple'>: (21, 256, 256, 12)
 saveResult("data/membrane/test", results)
