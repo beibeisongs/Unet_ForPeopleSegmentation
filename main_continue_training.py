@@ -162,7 +162,7 @@ def saveResult(save_path, npyfile, flag_multi_class=True, num_class=2):
     for i, item in enumerate(npyfile):
         if flag_multi_class:
             img = labelVisualize(num_class, COLOR_DICT, item)
-            io.imsave(os.path.join(save_path, "%d_predict.png" % i), img)
+            io.imsave(os.path.join(save_path, "%d_predict.jpg" % i), img)
         else:
             print("Error: please check the code !")
             exit(1)
