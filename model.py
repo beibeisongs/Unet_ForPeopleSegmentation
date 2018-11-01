@@ -62,7 +62,8 @@ def unet(pretrained_weights=None, input_size=(256, 256, 3)):
 
     model = Model(input=inputs, output=conv10)  # Note: inputs = Tensor("input_1:0", shape=(?, 256, 256, 1), dtype=float32); conv10 = Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)
 
-    model.compile(optimizer=Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+    # model.compile(optimizer=Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=RMSprop(lr=2e-5), loss='mse', metrics=['acc'])
     
     model.summary()
 

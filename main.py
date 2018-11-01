@@ -107,7 +107,7 @@ def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict,
         yield (img, mask)
 
 
-def testGenerator(test_path, num_image=30, target_size=(256, 256), flag_multi_class=True, as_gray=False):
+def testGenerator(test_path, num_image=7, target_size=(256, 256), flag_multi_class=True, as_gray=False):
     for i in range(num_image):
         img = io.imread(os.path.join(test_path, "%d.jpg" % i), as_gray=as_gray)
         img = img / 255
@@ -197,5 +197,5 @@ model_checkpoint = ModelCheckpoint('unet_membrane.hdf5', monitor='loss', verbose
 model.fit_generator(myGene, steps_per_epoch=200, epochs=1, callbacks=[model_checkpoint])  # Note: myGnene: <generator object trainGenerator at 0x000001B67F9FD830>
 
 testGene = testGenerator("data/membrane/test")
-results = model.predict_generator(testGene, 30, verbose=1)  # Note: {ndarray} shape = <class 'tuple'>: (21, 256, 256, 12)
+results = model.predict_generator(testGene, 7, verbose=1)  # Note: {ndarray} shape = <class 'tuple'>: (21, 256, 256, 12)
 saveResult("data/membrane/test", results)
